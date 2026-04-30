@@ -10,11 +10,10 @@ public class DiamondGenerator : MonoBehaviour
     public float waistRadius = 1.0f;
     public float topRadius = 0.53f;
 
-    [Header("Форма короны")]
-    [Range(0.2f, 0.8f)]
-    public float starFactor = 0.4f;
+    private float starFactor = 0.4f;
 
     private int segments = 8;
+    private float beltheight = 0.15f;
 
     private void Start() => Generate();
     private void OnValidate() => Generate();
@@ -41,7 +40,7 @@ public class DiamondGenerator : MonoBehaviour
 
         // --- STAR RADIUS + HEIGHT ---
         float starRadius = Mathf.Lerp(topRadius, waistRadius, starFactor);
-        float tipHeight = crownHeight * (1f - starFactor);
+        float tipHeight = crownHeight * (1f - starFactor + beltheight);
 
         // --- CROWN TIPS (жёлтые точки) ---
         for (int i = 0; i < segments; i++)
@@ -59,7 +58,7 @@ public class DiamondGenerator : MonoBehaviour
         }
 
         // --- UPPER BELT (верх пояса) ---
-        float upperBeltHeight = crownHeight * 0.15f;
+        float upperBeltHeight = crownHeight * beltheight;
 
         for (int i = 0; i < segments*2; i++)
         {
@@ -169,16 +168,31 @@ public class DiamondGenerator : MonoBehaviour
             AddTriangle(upperBelt[b0], belt[b1], belt[b0]);
         }
 
-        // --- 5. ПАВИЛЬОН (пока простой) ---
+        // --- 5. ПАВИЛЬОН ---
+        // --- Восемь четырехугольники ---
         for (int i = 0; i < segments; i++)
         {
             Vector3 a = belt[i * 2];
             Vector3 b = belt[(i * 2 + 1) % (segments * 2)];
             Vector3 c = belt[(i * 2 + 2) % (segments * 2)];
 
+
             int next = (i + 1) % segments;
-            AddTriangle(a, b, pavilionTip);
-            AddTriangle(b, c, pavilionTip);
+            AddTriangle((2 * pavilionTip + (a * 9) / 10) / 3, b, pavilionTip);
+            AddTriangle(b, (2 * pavilionTip + (c * 9) / 10) / 3, pavilionTip);
+        }
+
+        // --- 16 треугольников ---
+        for (int i = 0; i < segments; i++)
+        {
+            Vector3 a = belt[i * 2];
+            Vector3 b = belt[(i * 2 + 1) % (segments * 2)];
+            Vector3 c = belt[(i * 2 + 2) % (segments * 2)];
+
+
+            int next = (i + 1) % segments;
+            AddTriangle((2 * pavilionTip + (a * 9) / 10) / 3, a, b);
+            AddTriangle(b, c, (2 * pavilionTip + (c * 9) / 10) / 3);
         }
 
         Mesh mesh = new Mesh();
