@@ -25,8 +25,8 @@ public class DiamondGenerator : MonoBehaviour
 
         Vector3[] table = new Vector3[segments];
         Vector3[] crownTips = new Vector3[segments];
-        Vector3[] upperBelt = new Vector3[segments*2];
-        Vector3[] belt = new Vector3[segments*2];
+        Vector3[] upperBelt = new Vector3[segments * 2];
+        Vector3[] belt = new Vector3[segments * 2];
 
         // --- TABLE ---
         for (int i = 0; i < segments; i++)
@@ -60,9 +60,9 @@ public class DiamondGenerator : MonoBehaviour
         // --- UPPER BELT (верх пояса) ---
         float upperBeltHeight = crownHeight * beltheight;
 
-        for (int i = 0; i < segments*2; i++)
+        for (int i = 0; i < segments * 2; i++)
         {
-            float angle = i * angleStep/2;
+            float angle = i * angleStep / 2;
 
             float x = Mathf.Cos(angle);
             float z = Mathf.Sin(angle);
@@ -75,9 +75,9 @@ public class DiamondGenerator : MonoBehaviour
         }
 
         // --- LOWER BELT (низ пояса) ---
-        for (int i = 0; i < segments*2; i++)
+        for (int i = 0; i < segments * 2; i++)
         {
-            float angle = i * angleStep/2;
+            float angle = i * angleStep / 2;
 
             float x = Mathf.Cos(angle);
             float z = Mathf.Sin(angle);
@@ -134,7 +134,7 @@ public class DiamondGenerator : MonoBehaviour
 
             Vector3 a = crownTips[i];
             Vector3 b = crownTips[next];
-            Vector3 c = upperBelt[(i + 1)*2 % (segments * 2)];
+            Vector3 c = upperBelt[(i + 1) * 2 % (segments * 2)];
             Vector3 d = table[next];
 
             AddTriangle(a, b, c);
@@ -178,8 +178,8 @@ public class DiamondGenerator : MonoBehaviour
 
 
             int next = (i + 1) % segments;
-            AddTriangle((2 * pavilionTip + (a * 9) / 10) / 3, b, pavilionTip);
-            AddTriangle(b, (2 * pavilionTip + (c * 9) / 10) / 3, pavilionTip);
+            AddTriangle((2 * pavilionTip + (a * 14) / 15) / 3, b, pavilionTip);
+            AddTriangle(b, (2 * pavilionTip + (c * 14) / 15) / 3, pavilionTip);
         }
 
         // --- 16 треугольников ---
@@ -191,8 +191,8 @@ public class DiamondGenerator : MonoBehaviour
 
 
             int next = (i + 1) % segments;
-            AddTriangle((2 * pavilionTip + (a * 9) / 10) / 3, a, b);
-            AddTriangle(b, c, (2 * pavilionTip + (c * 9) / 10) / 3);
+            AddTriangle((2 * pavilionTip + (a * 14) / 15) / 3, a, b);
+            AddTriangle(b, c, (2 * pavilionTip + (c * 14) / 15) / 3);
         }
 
         Mesh mesh = new Mesh();
@@ -205,5 +205,11 @@ public class DiamondGenerator : MonoBehaviour
         mesh.RecalculateBounds();
 
         GetComponent<MeshFilter>().mesh = mesh;
+        MeshCollider mc = GetComponent<MeshCollider>();
+        if (mc != null)
+        {
+            mc.sharedMesh = null;
+            mc.sharedMesh = mesh;
+        }
     }
 }
