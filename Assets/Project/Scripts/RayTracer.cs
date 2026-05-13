@@ -3,222 +3,163 @@ using System.Collections.Generic;
 
 public class RayTracer : MonoBehaviour
 {
-    public LayerMask diamondLayer;
-
-    [Header("Scene")]
+    [Header("Diamond")]
     public Collider diamondCollider;
 
-    [Header("Rays")]
-    public int rayCount = 20;
+    [Header("Ray Source")]
+    public int rayCountX = 20;
+    public int rayCountY = 20;
     public float startX = -5f;
     public float heightRange = 2f;
-    public float maxDistance = 30f;
 
     [Header("Optics")]
     public float diamondIOR = 2.42f;
     public int maxBounces = 20;
-    public float surfaceOffset = 0.01f;
+    public float surfaceOffset = 0.005f;
 
-    [Header("Rendering")]
+    [Header("Visual")]
     public float lineWidth = 0.02f;
+    public Material lineMaterial;
 
-    private readonly List<LineRenderer> renderers = new();
+    // Состояние иерархии
+    private List<RaySegment> rootSegments = new List<RaySegment>();
+    private Vector3 lastDiamondPos;
+    private Quaternion lastDiamondRot;
+    private Vector3 lastDiamondScale;
+    private bool dirty = true;
+
+    class RaySegment
+    {
+        public GameObject gameObject;
+        public LineRenderer line;
+        public RaySegment parent;
+        public RaySegment child;
+    }
 
     void Start()
     {
-        CreateRenderers(500);
+        Physics.queriesHitBackfaces = true;
+        MarkDirty();
     }
 
     void Update()
     {
-        int rendererIndex = 0;
-
-        for (int i = 0; i < rayCount; i++)
+        CheckTransformChange();
+        if (dirty)
         {
-            float t = rayCount == 1
-                ? 0.5f
-                : (float)i / (rayCount - 1);
+            RebuildAllRays();
+            dirty = false;
+        }
+    }
 
-            float y = Mathf.Lerp(
-                -heightRange * 0.5f,
-                heightRange * 0.5f,
-                t
-            );
+    void CheckTransformChange()
+    {
+        if (diamondCollider == null) return;
+        Transform t = diamondCollider.transform;
+        if (t.position != lastDiamondPos || t.rotation != lastDiamondRot || t.localScale != lastDiamondScale)
+        {
+            lastDiamondPos = t.position;
+            lastDiamondRot = t.rotation;
+            lastDiamondScale = t.localScale;
+            MarkDirty();
+        }
+    }
 
-            Vector3 origin = new Vector3(startX, y, 0f);
+    public void MarkDirty() => dirty = true;
+
+    void RebuildAllRays()
+    {
+        ClearAll();
+        for (int i = 0; i < rayCountX; i++)
+        {
+            float t = rayCountX == 1 ? 0.5f : (float)i / (rayCountX - 1);
+            float y = Mathf.Lerp(-heightRange * 0.5f, heightRange * 0.5f, t);
+            Vector3 start = new Vector3(startX, y, 0f);
             Vector3 dir = Vector3.right;
 
-            bool inside = false;
-
-            for (int bounce = 0; bounce < maxBounces; bounce++)
-            {
-                Ray ray = new Ray(origin, dir);
-                
-                if (!Physics.Raycast(
-                    ray,
-                    out RaycastHit hit,
-                    maxDistance,
-                    diamondLayer
-                ))
-                {
-                    DrawSegment(
-                        rendererIndex++,
-                        origin,
-                        origin + dir * maxDistance,
-                        inside ? Color.yellow : Color.white
-                    );
-
-                    break;
-                }
-
-                Vector3 normal = hit.normal.normalized;
-
-                bool entering = Vector3.Dot(dir, normal) < 0f;
-
-                // DEBUG COLOR
-                Color segmentColor;
-
-                if (entering)
-                    segmentColor = Color.red;
-                else
-                    segmentColor = Color.blue;
-
-                DrawSegment(
-                    rendererIndex++,
-                    origin,
-                    hit.point,
-                    segmentColor
-                );
-
-                float n1 = entering ? 1f : diamondIOR;
-                float n2 = entering ? diamondIOR : 1f;
-
-                Vector3 adjustedNormal =
-                    entering
-                    ? normal
-                    : -normal;
-
-                bool tir;
-
-                Vector3 refracted = Refract(
-                    dir,
-                    adjustedNormal,
-                    n1,
-                    n2,
-                    out tir
-                );
-
-                // Полное внутреннее отражение
-                if (tir)
-                {
-                    Vector3 reflected =
-                        Vector3.Reflect(dir, adjustedNormal).normalized;
-
-                    DrawSegment(
-                        rendererIndex++,
-                        hit.point,
-                        hit.point + reflected * 0.5f,
-                        Color.green
-                    );
-
-                    dir = reflected;
-
-                    origin = hit.point + dir * surfaceOffset;
-
-                    inside = true;
-
-                    continue;
-                }
-
-                dir = refracted.normalized;
-
-                origin = hit.point + dir * surfaceOffset;
-
-                inside = !entering;
-            }
-        }
-
-        // Hide unused renderers
-        for (int i = rendererIndex; i < renderers.Count; i++)
-        {
-            renderers[i].positionCount = 0;
+            RaySegment root = CreateSegment(null, start, start);
+            rootSegments.Add(root);
+            TraceRayRecursive(root, start, dir, false, 0);
         }
     }
 
-    void DrawSegment(
-        int index,
-        Vector3 a,
-        Vector3 b,
-        Color color
-    )
+    void TraceRayRecursive(RaySegment seg, Vector3 origin, Vector3 dir, bool insideDiamond, int depth)
     {
-        if (index >= renderers.Count)
-            CreateRenderers(100);
-
-        LineRenderer lr = renderers[index];
-
-        lr.positionCount = 2;
-
-        lr.SetPosition(0, a);
-        lr.SetPosition(1, b);
-
-        lr.startColor = color;
-        lr.endColor = color;
-    }
-
-    void CreateRenderers(int count)
-    {
-        for (int i = 0; i < count; i++)
+        if (depth >= maxBounces)
         {
-            GameObject go = new GameObject($"Segment_{renderers.Count}");
+            seg.line.SetPosition(0, origin);
+            seg.line.SetPosition(1, origin + dir * 100f);
+            return;
+        }
 
-            go.transform.SetParent(transform);
+        Ray ray = new Ray(origin, dir);
+        if (diamondCollider.Raycast(ray, out RaycastHit hit, 100f))
+        {
+            seg.line.SetPosition(0, origin);
+            seg.line.SetPosition(1, hit.point);
 
-            LineRenderer lr = go.AddComponent<LineRenderer>();
+            Vector3 normal = hit.normal;
+            if (Vector3.Dot(dir, normal) > 0f) normal = -normal;
 
-            lr.material =
-                new Material(Shader.Find("Sprites/Default"));
+            float n1 = insideDiamond ? diamondIOR : 1f;
+            float n2 = insideDiamond ? 1f : diamondIOR;
 
-            lr.startWidth = lineWidth;
-            lr.endWidth = lineWidth;
+            Vector3 newDir = Refract(dir, normal, n1, n2, out bool tir);
+            if (tir) newDir = Vector3.Reflect(dir, normal).normalized;
 
-            renderers.Add(lr);
+            bool newInside = tir ? insideDiamond : !insideDiamond;
+
+            RaySegment child = CreateSegment(seg, hit.point, hit.point);
+            seg.child = child;
+            TraceRayRecursive(child, hit.point + newDir * surfaceOffset, newDir, newInside, depth + 1);
+        }
+        else
+        {
+            seg.line.SetPosition(0, origin);
+            seg.line.SetPosition(1, origin + dir * 100f);
         }
     }
 
-    Vector3 Refract(
-        Vector3 incident,
-        Vector3 normal,
-        float n1,
-        float n2,
-        out bool tir
-    )
+    Vector3 Refract(Vector3 incident, Vector3 normal, float n1, float n2, out bool tir)
     {
         incident.Normalize();
         normal.Normalize();
-
         float eta = n1 / n2;
-
         float cosI = -Vector3.Dot(normal, incident);
-
-        float sinT2 =
-            eta * eta * (1f - cosI * cosI);
-
-        // Полное внутреннее отражение
-        if (sinT2 > 1f)
+        float sin2 = eta * eta * (1f - cosI * cosI);
+        if (sin2 > 1f)
         {
             tir = true;
             return Vector3.zero;
         }
-
         tir = false;
+        float cosT = Mathf.Sqrt(1f - sin2);
+        return (eta * incident + (eta * cosI - cosT) * normal).normalized;
+    }
 
-        float cosT = Mathf.Sqrt(1f - sinT2);
+    RaySegment CreateSegment(RaySegment parent, Vector3 start, Vector3 end)
+    {
+        GameObject go = new GameObject("RaySegment");
+        go.transform.SetParent(parent != null ? parent.gameObject.transform : transform);
+        LineRenderer lr = go.AddComponent<LineRenderer>();
+        lr.material = lineMaterial ? lineMaterial : new Material(Shader.Find("Sprites/Default"));
+        lr.startWidth = lineWidth;
+        lr.endWidth = lineWidth;
+        lr.positionCount = 2;
+        lr.SetPosition(0, start);
+        lr.SetPosition(1, end);
+        lr.useWorldSpace = true;
+        lr.startColor = Color.white;
+        lr.endColor = Color.white;
 
-        Vector3 refracted =
-            eta * incident +
-            (eta * cosI - cosT) * normal;
+        return new RaySegment { gameObject = go, line = lr, parent = parent };
+    }
 
-        return refracted.normalized;
+    void ClearAll()
+    {
+        foreach (var seg in rootSegments)
+            if (seg?.gameObject != null)
+                Destroy(seg.gameObject);
+        rootSegments.Clear();
     }
 }

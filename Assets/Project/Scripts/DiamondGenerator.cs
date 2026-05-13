@@ -15,10 +15,16 @@ public class DiamondGenerator : MonoBehaviour
     private int segments = 8;
     private float beltheight = 0.15f;
 
-    private void Start() => Generate();
     private void OnValidate() => Generate();
 
     [ContextMenu("Generate")]
+
+    void Start()
+    {
+        Physics.queriesHitBackfaces = true;
+        Generate();
+    }
+
     private void Generate()
     {
         float angleStep = Mathf.PI * 2 / segments;
