@@ -7,9 +7,9 @@ public class RayTracer : MonoBehaviour
     public Collider diamondCollider;
 
     [Header("Ray Source")]
-    public int rayCountX = 20;
-    public int rayCountY = 20;
-    public float startX = -5f;
+    public int rayCount = 1;
+    public bool rayX= true;
+    public float startX = 0f;
     public float heightRange = 2f;
 
     [Header("Optics")]
@@ -72,16 +72,21 @@ public class RayTracer : MonoBehaviour
     void RebuildAllRays()
     {
         ClearAll();
-        for (int i = 0; i < rayCountX; i++)
+        for (int i = 0; i < (rayX == true ? rayCount : 1); i++)
         {
-            float t = rayCountX == 1 ? 0.5f : (float)i / (rayCountX - 1);
-            float y = Mathf.Lerp(-heightRange * 0.5f, heightRange * 0.5f, t);
-            Vector3 start = new Vector3(startX, y, 0f);
-            Vector3 dir = Vector3.right;
+            float tz = rayCount == 1 ? 0.5f : (float)i / (rayCount - 1);
+            float z = rayX == false ? 0 : Mathf.Lerp(-heightRange * 0.5f, heightRange * 0.5f, tz);
+            for (int j = 0; j < rayCount; j++)
+            {
+                float t = rayCount == 1 ? 0.5f : (float)j / (rayCount - 1);
+                float y = Mathf.Lerp(-heightRange * 0.5f, heightRange * 0.5f, t);
+                Vector3 start = new Vector3(startX, y, z);
+                Vector3 dir = Vector3.right;
 
-            RaySegment root = CreateSegment(null, start, start);
-            rootSegments.Add(root);
-            TraceRayRecursive(root, start, dir, false, 0);
+                RaySegment root = CreateSegment(null, start, start);
+                rootSegments.Add(root);
+                TraceRayRecursive(root, start, dir, false, 0);
+            }
         }
     }
 
