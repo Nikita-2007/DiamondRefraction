@@ -28,6 +28,8 @@ public class RayTracer : MonoBehaviour
     private Vector3 lastDiamondScale;
     private bool dirty = true;
 
+    private void OnValidate() => RebuildAllRays();
+
     class RaySegment
     {
         public GameObject gameObject;
