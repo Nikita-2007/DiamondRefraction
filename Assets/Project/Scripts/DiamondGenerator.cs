@@ -12,7 +12,7 @@ public class DiamondGenerator : MonoBehaviour
 
     private float starFactor = 0.4f;
 
-    private int segments = 8;
+    public int segments = 8;
     private float beltheight = 0.15f;
 
     private void OnValidate() => Generate();
@@ -25,7 +25,7 @@ public class DiamondGenerator : MonoBehaviour
         Generate();
     }
 
-    private void Generate()
+    public void Generate()
     {
         float angleStep = Mathf.PI * 2 / segments;
 
@@ -46,9 +46,13 @@ public class DiamondGenerator : MonoBehaviour
 
         // --- STAR RADIUS + HEIGHT ---
         float starRadius = Mathf.Lerp(topRadius, waistRadius, starFactor);
-        float tipHeight = crownHeight * (1f - starFactor + beltheight);
 
-        // --- CROWN TIPS (жёлтые точки) ---
+        // --- CROWN TIPS ---
+        float upperBeltHeight = crownHeight * beltheight;
+
+        float tipHeight = upperBeltHeight + (Mathf.Cos(Mathf.PI / segments) * starRadius - waistRadius) / (topRadius - waistRadius) * (crownHeight - upperBeltHeight);
+
+        // --- CROWN TIPS ---
         for (int i = 0; i < segments; i++)
         {
             float midAngle = (i + 0.5f) * angleStep;
@@ -64,7 +68,6 @@ public class DiamondGenerator : MonoBehaviour
         }
 
         // --- UPPER BELT (верх пояса) ---
-        float upperBeltHeight = crownHeight * beltheight;
 
         for (int i = 0; i < segments * 2; i++)
         {

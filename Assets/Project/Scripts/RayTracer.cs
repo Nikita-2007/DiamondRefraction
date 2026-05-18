@@ -1,4 +1,4 @@
-using UnityEngine;
+п»їusing UnityEngine;
 using System.Collections.Generic;
 
 public class RayTracer : MonoBehaviour
@@ -7,34 +7,49 @@ public class RayTracer : MonoBehaviour
     public Collider diamondCollider;
 
     [Header("Ray Source")]
-    public RaySource raySource;          // Ссылка на источник лучей
+    [Range(1, 100)]
+    public int rayCount = 5;
+
+    public bool enableGrid = false;
+
+    [Range(0.1f, 10f)]
+    public float spread = 2f;
 
     [Header("Optics")]
     public float diamondIOR = 2.42f;
-    public int maxBounces = 20;
-    public float surfaceOffset = 0.005f;
+
+    [Range(1, 50)]
+    public int maxBounces = 15;
+
+    public float surfaceOffset = 0.001f;
 
     [Header("Visual")]
     public float lineWidth = 0.02f;
     public Material lineMaterial;
 
-    // Состояние иерархии
-    private List<RaySegment> rootSegments = new List<RaySegment>();
+    [Header("Ray Direction")]
+    public Transform rayDirection;
+
+    private bool dirty = true;
+    private int lastRayCount;
+    private bool lastEnableGrid;
+    private float lastSpread;
+    private float lastIOR;
+    private int lastBounces;
+
     private Vector3 lastDiamondPos;
     private Quaternion lastDiamondRot;
     private Vector3 lastDiamondScale;
-    private Vector3 lastSourcePos;
-    private Quaternion lastSourceRot;
-    private int lastRayCount;
-    private float lastSourceHeight;
-    private float lastSourceWidth;
-    private bool dirty = true;
+
+    private Vector3 lastEmitterPos;
+    private Quaternion lastEmitterRot;
+
+    private readonly List<RaySegment> rootSegments = new();
 
     class RaySegment
     {
         public GameObject gameObject;
         public LineRenderer line;
-        public RaySegment parent;
         public RaySegment child;
     }
 
@@ -44,15 +59,10 @@ public class RayTracer : MonoBehaviour
         MarkDirty();
     }
 
-    void OnValidate()
-    {
-        if (Application.isPlaying)
-            MarkDirty();
-    }
-
     void Update()
     {
         CheckChanges();
+
         if (dirty)
         {
             RebuildAllRays();
@@ -62,67 +72,145 @@ public class RayTracer : MonoBehaviour
 
     void CheckChanges()
     {
+        bool changed = false;
+
+        // --- Diamond transform ---
         if (diamondCollider != null)
         {
             Transform t = diamondCollider.transform;
-            if (t.position != lastDiamondPos || t.rotation != lastDiamondRot || t.localScale != lastDiamondScale)
+
+            if (
+                t.position != lastDiamondPos ||
+                t.rotation != lastDiamondRot ||
+                t.localScale != lastDiamondScale
+            )
             {
                 lastDiamondPos = t.position;
                 lastDiamondRot = t.rotation;
                 lastDiamondScale = t.localScale;
-                MarkDirty();
+
+                changed = true;
             }
         }
 
-        if (raySource != null)
+        // --- Emitter transform ---
+        if (rayDirection != null)
         {
-            Transform s = raySource.transform;
-            if (s.position != lastSourcePos || s.rotation != lastSourceRot ||
-                raySource.rayCount != lastRayCount ||
-                raySource.sourceHeight != lastSourceHeight ||
-                raySource.sourceWidth != lastSourceWidth)
+            if (
+                rayDirection.position != lastEmitterPos ||
+                rayDirection.rotation != lastEmitterRot
+            )
             {
-                lastSourcePos = s.position;
-                lastSourceRot = s.rotation;
-                lastRayCount = raySource.rayCount;
-                lastSourceHeight = raySource.sourceHeight;
-                lastSourceWidth = raySource.sourceWidth;
-                MarkDirty();
+                lastEmitterPos = rayDirection.position;
+                lastEmitterRot = rayDirection.rotation;
+
+                changed = true;
             }
         }
+
+        // --- Parameters ---
+        if (
+            rayCount != lastRayCount ||
+            enableGrid != lastEnableGrid ||
+            spread != lastSpread ||
+            diamondIOR != lastIOR ||
+            maxBounces != lastBounces
+        )
+        {
+            lastRayCount = rayCount;
+            lastEnableGrid = enableGrid;
+            lastSpread = spread;
+            lastIOR = diamondIOR;
+            lastBounces = maxBounces;
+
+            changed = true;
+        }
+
+        if (changed)
+            MarkDirty();
     }
 
-    public void MarkDirty() => dirty = true;
+    public void MarkDirty()
+    {
+        dirty = true;
+    }
 
     void RebuildAllRays()
     {
         ClearAll();
 
-        if (raySource == null) return;
+        int xCount = enableGrid ? rayCount : 1;
 
-        // Создаём лучи в 2D сетке (по ширине и высоте источника)
-        for (int i = 0; i < raySource.rayCount; i++)
+        for (int ix = 0; ix < xCount; ix++)
         {
-            float tX = raySource.rayCount == 1 ? 0.5f : (float)i / (raySource.rayCount - 1);
-            float x = Mathf.Lerp(-raySource.sourceWidth * 0.5f, raySource.sourceWidth * 0.5f, tX);
+            float tx = xCount == 1
+                ? 0.5f
+                : (float)ix / (xCount - 1);
 
-            for (int j = 0; j < raySource.rayCount; j++)
+            float zOffset = Mathf.Lerp(
+                -spread * 0.5f,
+                spread * 0.5f,
+                tx
+            );
+
+            for (int iy = 0; iy < rayCount; iy++)
             {
-                float tY = raySource.rayCount == 1 ? 0.5f : (float)j / (raySource.rayCount - 1);
-                float y = Mathf.Lerp(-raySource.sourceHeight * 0.5f, raySource.sourceHeight * 0.5f, tY);
+                float ty = rayCount == 1
+                    ? 0.5f
+                    : (float)iy / (rayCount - 1);
 
-                Vector3 localStart = new Vector3(x, y, 0f);
-                Vector3 start = raySource.transform.TransformPoint(localStart);
-                Vector3 dir = raySource.transform.right; // лучи летят вперёд по красной оси
+                float yOffset = Mathf.Lerp(
+                    -spread * 0.5f,
+                    spread * 0.5f,
+                    ty
+                );
 
-                RaySegment root = CreateSegment(null, start, start);
+                Vector3 localOffset =
+                    rayDirection.up * yOffset +
+                    rayDirection.right * zOffset;
+
+                Vector3 startPos;
+
+                if (rayDirection != null)
+                {
+                    startPos =  rayDirection.position + localOffset;
+                }
+                else
+                {
+                    startPos = new Vector3(0, yOffset, zOffset);
+                }
+
+                Vector3 dir =
+                    rayDirection != null
+                    ? rayDirection.forward
+                    : Vector3.right;
+
+                RaySegment root = CreateSegment(
+                    null,
+                    startPos,
+                    startPos
+                );
+
                 rootSegments.Add(root);
-                TraceRayRecursive(root, start, dir, false, 0);
+
+                TraceRayRecursive(
+                    root,
+                    startPos,
+                    dir.normalized,
+                    false,
+                    0
+                );
             }
         }
     }
 
-    void TraceRayRecursive(RaySegment seg, Vector3 origin, Vector3 dir, bool insideDiamond, int depth)
+    void TraceRayRecursive(
+        RaySegment seg,
+        Vector3 origin,
+        Vector3 dir,
+        bool insideDiamond,
+        int depth
+    )
     {
         if (depth >= maxBounces)
         {
@@ -132,25 +220,59 @@ public class RayTracer : MonoBehaviour
         }
 
         Ray ray = new Ray(origin, dir);
-        if (diamondCollider != null && diamondCollider.Raycast(ray, out RaycastHit hit, 100f))
+
+        if (
+            diamondCollider.Raycast(
+                ray,
+                out RaycastHit hit,
+                100f
+            )
+        )
         {
             seg.line.SetPosition(0, origin);
             seg.line.SetPosition(1, hit.point);
 
             Vector3 normal = hit.normal;
-            if (Vector3.Dot(dir, normal) > 0f) normal = -normal;
+
+            if (Vector3.Dot(dir, normal) > 0f)
+                normal = -normal;
 
             float n1 = insideDiamond ? diamondIOR : 1f;
             float n2 = insideDiamond ? 1f : diamondIOR;
 
-            Vector3 newDir = Refract(dir, normal, n1, n2, out bool tir);
-            if (tir) newDir = Vector3.Reflect(dir, normal).normalized;
+            Vector3 newDir =
+                Refract(
+                    dir,
+                    normal,
+                    n1,
+                    n2,
+                    out bool tir
+                );
 
-            bool newInside = tir ? insideDiamond : !insideDiamond;
+            if (tir)
+            {
+                newDir =
+                    Vector3.Reflect(dir, normal).normalized;
+            }
 
-            RaySegment child = CreateSegment(seg, hit.point, hit.point);
+            bool newInside =
+                tir ? insideDiamond : !insideDiamond;
+
+            RaySegment child = CreateSegment(
+                seg,
+                hit.point,
+                hit.point
+            );
+
             seg.child = child;
-            TraceRayRecursive(child, hit.point + newDir * surfaceOffset, newDir, newInside, depth + 1);
+
+            TraceRayRecursive(
+                child,
+                hit.point + newDir * surfaceOffset,
+                newDir,
+                newInside,
+                depth + 1
+            );
         }
         else
         {
@@ -159,63 +281,97 @@ public class RayTracer : MonoBehaviour
         }
     }
 
-    Vector3 Refract(Vector3 incident, Vector3 normal, float n1, float n2, out bool tir)
+    Vector3 Refract(
+        Vector3 incident,
+        Vector3 normal,
+        float n1,
+        float n2,
+        out bool tir
+    )
     {
         incident.Normalize();
         normal.Normalize();
+
         float eta = n1 / n2;
-        float cosI = -Vector3.Dot(normal, incident);
-        float sin2 = eta * eta * (1f - cosI * cosI);
-        if (sin2 > 1f)
+
+        float cosI =
+            -Vector3.Dot(normal, incident);
+
+        float sinT2 =
+            eta * eta * (1f - cosI * cosI);
+
+        if (sinT2 > 1f)
         {
             tir = true;
             return Vector3.zero;
         }
+
         tir = false;
-        float cosT = Mathf.Sqrt(1f - sin2);
-        return (eta * incident + (eta * cosI - cosT) * normal).normalized;
+
+        float cosT =
+            Mathf.Sqrt(1f - sinT2);
+
+        return (
+            eta * incident +
+            (eta * cosI - cosT) * normal
+        ).normalized;
     }
 
-    RaySegment CreateSegment(RaySegment parent, Vector3 start, Vector3 end)
+    RaySegment CreateSegment(
+        RaySegment parent,
+        Vector3 start,
+        Vector3 end
+    )
     {
-        GameObject go = new GameObject("RaySegment");
-        go.transform.SetParent(parent != null ? parent.gameObject.transform : transform);
-        LineRenderer lr = go.AddComponent<LineRenderer>();
-        lr.material = lineMaterial ? lineMaterial : new Material(Shader.Find("Sprites/Default"));
+        GameObject go =
+            new GameObject("RaySegment");
+
+        go.transform.SetParent(
+            parent != null
+            ? parent.gameObject.transform
+            : transform
+        );
+
+        LineRenderer lr =
+            go.AddComponent<LineRenderer>();
+
+        lr.material =
+            lineMaterial != null
+            ? lineMaterial
+            : new Material(
+                Shader.Find("Sprites/Default")
+            );
+
+        lr.positionCount = 2;
+
         lr.startWidth = lineWidth;
         lr.endWidth = lineWidth;
-        lr.positionCount = 2;
+
+        lr.useWorldSpace = true;
+
         lr.SetPosition(0, start);
         lr.SetPosition(1, end);
-        lr.useWorldSpace = true;
+
         lr.startColor = Color.white;
         lr.endColor = Color.white;
 
-        return new RaySegment { gameObject = go, line = lr, parent = parent };
+        return new RaySegment
+        {
+            gameObject = go,
+            line = lr
+        };
     }
 
     void ClearAll()
     {
         foreach (var seg in rootSegments)
         {
-            if (seg?.gameObject != null)
+            if (seg != null && seg.gameObject != null)
             {
-                if (Application.isPlaying)
-                    Destroy(seg.gameObject);
-                else
-                    DestroyImmediate(seg.gameObject);
+                Destroy(seg.gameObject);
             }
         }
-        rootSegments.Clear();
 
-        // Удаляем всех детей на всякий случай
-        for (int i = transform.childCount - 1; i >= 0; i--)
-        {
-            Transform child = transform.GetChild(i);
-            if (Application.isPlaying)
-                Destroy(child.gameObject);
-            else
-                DestroyImmediate(child.gameObject);
-        }
+        rootSegments.Clear();
     }
 }
