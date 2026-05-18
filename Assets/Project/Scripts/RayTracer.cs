@@ -7,10 +7,7 @@ public class RayTracer : MonoBehaviour
     public Collider diamondCollider;
 
     [Header("Ray Source")]
-    public int rayCount = 1;
-    public bool rayX= true;
-    public float startX = 0f;
-    public float heightRange = 2f;
+    public RaySource raySource;          // —сылка на источник лучей
 
     [Header("Optics")]
     public float diamondIOR = 2.42f;
@@ -26,9 +23,12 @@ public class RayTracer : MonoBehaviour
     private Vector3 lastDiamondPos;
     private Quaternion lastDiamondRot;
     private Vector3 lastDiamondScale;
+    private Vector3 lastSourcePos;
+    private Quaternion lastSourceRot;
+    private int lastRayCount;
+    private float lastSourceHeight;
+    private float lastSourceWidth;
     private bool dirty = true;
-
-    private void OnValidate() => RebuildAllRays();
 
     class RaySegment
     {
@@ -44,9 +44,15 @@ public class RayTracer : MonoBehaviour
         MarkDirty();
     }
 
+    void OnValidate()
+    {
+        if (Application.isPlaying)
+            MarkDirty();
+    }
+
     void Update()
     {
-        CheckTransformChange();
+        CheckChanges();
         if (dirty)
         {
             RebuildAllRays();
@@ -54,16 +60,35 @@ public class RayTracer : MonoBehaviour
         }
     }
 
-    void CheckTransformChange()
+    void CheckChanges()
     {
-        if (diamondCollider == null) return;
-        Transform t = diamondCollider.transform;
-        if (t.position != lastDiamondPos || t.rotation != lastDiamondRot || t.localScale != lastDiamondScale)
+        if (diamondCollider != null)
         {
-            lastDiamondPos = t.position;
-            lastDiamondRot = t.rotation;
-            lastDiamondScale = t.localScale;
-            MarkDirty();
+            Transform t = diamondCollider.transform;
+            if (t.position != lastDiamondPos || t.rotation != lastDiamondRot || t.localScale != lastDiamondScale)
+            {
+                lastDiamondPos = t.position;
+                lastDiamondRot = t.rotation;
+                lastDiamondScale = t.localScale;
+                MarkDirty();
+            }
+        }
+
+        if (raySource != null)
+        {
+            Transform s = raySource.transform;
+            if (s.position != lastSourcePos || s.rotation != lastSourceRot ||
+                raySource.rayCount != lastRayCount ||
+                raySource.sourceHeight != lastSourceHeight ||
+                raySource.sourceWidth != lastSourceWidth)
+            {
+                lastSourcePos = s.position;
+                lastSourceRot = s.rotation;
+                lastRayCount = raySource.rayCount;
+                lastSourceHeight = raySource.sourceHeight;
+                lastSourceWidth = raySource.sourceWidth;
+                MarkDirty();
+            }
         }
     }
 
@@ -72,16 +97,23 @@ public class RayTracer : MonoBehaviour
     void RebuildAllRays()
     {
         ClearAll();
-        for (int i = 0; i < (rayX == true ? rayCount : 1); i++)
+
+        if (raySource == null) return;
+
+        // —оздаЄм лучи в 2D сетке (по ширине и высоте источника)
+        for (int i = 0; i < raySource.rayCount; i++)
         {
-            float tz = rayCount == 1 ? 0.5f : (float)i / (rayCount - 1);
-            float z = rayX == false ? 0 : Mathf.Lerp(-heightRange * 0.5f, heightRange * 0.5f, tz);
-            for (int j = 0; j < rayCount; j++)
+            float tX = raySource.rayCount == 1 ? 0.5f : (float)i / (raySource.rayCount - 1);
+            float x = Mathf.Lerp(-raySource.sourceWidth * 0.5f, raySource.sourceWidth * 0.5f, tX);
+
+            for (int j = 0; j < raySource.rayCount; j++)
             {
-                float t = rayCount == 1 ? 0.5f : (float)j / (rayCount - 1);
-                float y = Mathf.Lerp(-heightRange * 0.5f, heightRange * 0.5f, t);
-                Vector3 start = new Vector3(startX, y, z);
-                Vector3 dir = Vector3.right;
+                float tY = raySource.rayCount == 1 ? 0.5f : (float)j / (raySource.rayCount - 1);
+                float y = Mathf.Lerp(-raySource.sourceHeight * 0.5f, raySource.sourceHeight * 0.5f, tY);
+
+                Vector3 localStart = new Vector3(x, y, 0f);
+                Vector3 start = raySource.transform.TransformPoint(localStart);
+                Vector3 dir = raySource.transform.right; // лучи лет€т вперЄд по красной оси
 
                 RaySegment root = CreateSegment(null, start, start);
                 rootSegments.Add(root);
@@ -100,7 +132,7 @@ public class RayTracer : MonoBehaviour
         }
 
         Ray ray = new Ray(origin, dir);
-        if (diamondCollider.Raycast(ray, out RaycastHit hit, 100f))
+        if (diamondCollider != null && diamondCollider.Raycast(ray, out RaycastHit hit, 100f))
         {
             seg.line.SetPosition(0, origin);
             seg.line.SetPosition(1, hit.point);
@@ -165,8 +197,25 @@ public class RayTracer : MonoBehaviour
     void ClearAll()
     {
         foreach (var seg in rootSegments)
+        {
             if (seg?.gameObject != null)
-                Destroy(seg.gameObject);
+            {
+                if (Application.isPlaying)
+                    Destroy(seg.gameObject);
+                else
+                    DestroyImmediate(seg.gameObject);
+            }
+        }
         rootSegments.Clear();
+
+        // ”дал€ем всех детей на вс€кий случай
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            Transform child = transform.GetChild(i);
+            if (Application.isPlaying)
+                Destroy(child.gameObject);
+            else
+                DestroyImmediate(child.gameObject);
+        }
     }
 }
