@@ -5,7 +5,7 @@ public class SelectionManager : MonoBehaviour
 {
     public UIPanelAnimator diamondPanel;
     public UIPanelAnimator rayPanel;
-    public RuntimeTransformGizmo gizmo;
+    public RuntimeTransformHandle handle;
 
     void Update()
     {
@@ -29,7 +29,7 @@ public class SelectionManager : MonoBehaviour
                     diamondPanel.Show();
                     rayPanel.Hide();
 
-                    gizmo.SetTarget(hit.transform);
+                    handle.Show(hit.transform);
 
                     return;
                 }
@@ -38,14 +38,14 @@ public class SelectionManager : MonoBehaviour
                     rayPanel.Show();
                     diamondPanel.Hide();
 
-                    gizmo.SetTarget(hit.transform);
+                    handle.Show(hit.transform);
 
                     return;
                 }
             }
             diamondPanel.Hide();
             rayPanel.Hide();
-            gizmo.Hide();
+            handle.Hide();
         }
     }
 }
