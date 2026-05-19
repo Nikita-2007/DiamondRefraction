@@ -8,18 +8,18 @@ public class RayTracer : MonoBehaviour
 
     [Header("Ray Source")]
     [Range(1, 100)]
-    public int rayCount = 5;
+    public int rayCount = 3;
 
     public bool enableGrid = false;
 
     [Range(0.1f, 10f)]
-    public float spread = 2f;
+    public float spread = 1.5f;
 
     [Header("Optics")]
     public float diamondIOR = 2.42f;
 
     [Range(1, 50)]
-    public int maxBounces = 15;
+    public int maxBounces = 30;
 
     public float surfaceOffset = 0.001f;
 

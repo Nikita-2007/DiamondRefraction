@@ -28,5 +28,11 @@ public class RayEmitterVisualizer : MonoBehaviour
             : thickness;
 
         transform.localScale = scale;
+        BoxCollider col = GetComponent<BoxCollider>();
+
+        if (col != null)
+        {
+            col.size = Vector3.one;
+        }
     }
 }
