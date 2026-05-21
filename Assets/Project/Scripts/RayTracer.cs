@@ -18,6 +18,13 @@ public class RayTracer : MonoBehaviour
     [Header("Optics")]
     public float diamondIOR = 2.42f;
 
+    [Header("Dispersion")]
+    public bool chromaticAberration = false;
+
+    public float redIOR = 2.40f;
+    public float greenIOR = 2.42f;
+    public float blueIOR = 2.45f;
+
     [Range(1, 50)]
     public int maxBounces = 30;
 
@@ -193,76 +200,107 @@ public class RayTracer : MonoBehaviour
 
                 rootSegments.Add(root);
 
+
                 TraceRayRecursive(
                     root,
                     startPos,
-                    dir.normalized,
+                    dir,
                     false,
-                    0
+                    0,
+                    Color.white,
+                    diamondIOR
                 );
             }
         }
     }
 
     void TraceRayRecursive(
-        RaySegment seg,
-        Vector3 origin,
-        Vector3 dir,
-        bool insideDiamond,
-        int depth
-    )
+    RaySegment seg,
+    Vector3 origin,
+    Vector3 dir,
+    bool insideDiamond,
+    int depth,
+    Color rayColor,
+    float currentIOR
+)
     {
         if (depth >= maxBounces)
         {
             seg.line.SetPosition(0, origin);
             seg.line.SetPosition(1, origin + dir * 100f);
+
+            seg.line.startColor = rayColor;
+            seg.line.endColor = rayColor;
+
             return;
         }
 
         Ray ray = new Ray(origin, dir);
 
-        if (
-            diamondCollider.Raycast(
-                ray,
-                out RaycastHit hit,
-                100f
-            )
-        )
+        if (diamondCollider.Raycast(ray, out RaycastHit hit, 100f))
         {
             seg.line.SetPosition(0, origin);
             seg.line.SetPosition(1, hit.point);
+
+            seg.line.startColor = rayColor;
+            seg.line.endColor = rayColor;
 
             Vector3 normal = hit.normal;
 
             if (Vector3.Dot(dir, normal) > 0f)
                 normal = -normal;
 
-            float n1 = insideDiamond ? diamondIOR : 1f;
-            float n2 = insideDiamond ? 1f : diamondIOR;
+            float n1 = insideDiamond ? currentIOR : 1f;
+            float n2 = insideDiamond ? 1f : currentIOR;
 
-            Vector3 newDir =
-                Refract(
+            // ===== ДИСПЕРСИЯ =====
+            if (!insideDiamond && chromaticAberration && rayColor == Color.white)
+            {
+                SpawnDispersionRay(
+                    seg,
+                    hit.point,
                     dir,
                     normal,
-                    n1,
-                    n2,
-                    out bool tir
+                    Color.red,
+                    redIOR,
+                    depth
                 );
 
+                SpawnDispersionRay(
+                    seg,
+                    hit.point,
+                    dir,
+                    normal,
+                    Color.green,
+                    greenIOR,
+                    depth
+                );
+
+                SpawnDispersionRay(
+                    seg,
+                    hit.point,
+                    dir,
+                    normal,
+                    Color.blue,
+                    blueIOR,
+                    depth
+                );
+
+                return;
+            }
+
+            Vector3 newDir =
+                Refract(dir, normal, n1, n2, out bool tir);
+
             if (tir)
-            {
                 newDir =
                     Vector3.Reflect(dir, normal).normalized;
-            }
 
             bool newInside =
                 tir ? insideDiamond : !insideDiamond;
 
-            RaySegment child = CreateSegment(
-                seg,
-                hit.point,
-                hit.point
-            );
+            RaySegment child =
+                CreateSegment(seg, hit.point, hit.point);
 
             seg.child = child;
 
@@ -271,14 +309,50 @@ public class RayTracer : MonoBehaviour
                 hit.point + newDir * surfaceOffset,
                 newDir,
                 newInside,
-                depth + 1
+                depth + 1,
+                rayColor,
+                currentIOR
             );
         }
         else
         {
             seg.line.SetPosition(0, origin);
             seg.line.SetPosition(1, origin + dir * 100f);
+
+            seg.line.startColor = rayColor;
+            seg.line.endColor = rayColor;
         }
+    }
+
+    void SpawnDispersionRay(
+    RaySegment parent,
+    Vector3 hitPoint,
+    Vector3 dir,
+    Vector3 normal,
+    Color color,
+    float ior,
+    int depth
+)
+    {
+        Vector3 refracted =
+            Refract(dir, normal, 1f, ior, out bool tir);
+
+        if (tir)
+            refracted =
+                Vector3.Reflect(dir, normal).normalized;
+
+        RaySegment child =
+            CreateSegment(parent, hitPoint, hitPoint);
+
+        TraceRayRecursive(
+            child,
+            hitPoint + refracted * surfaceOffset,
+            refracted,
+            true,
+            depth + 1,
+            color,
+            ior
+        );
     }
 
     Vector3 Refract(

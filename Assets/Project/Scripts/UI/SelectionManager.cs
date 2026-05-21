@@ -24,6 +24,10 @@ public class SelectionManager : MonoBehaviour
                 {
                     return;
                 }
+                if (hit.collider.GetComponentInParent<RuntimeTransformHandle>())
+                {
+                    return;
+                }
                 if (hit.collider.GetComponent<DiamondGenerator>())
                 {
                     diamondPanel.Show();
