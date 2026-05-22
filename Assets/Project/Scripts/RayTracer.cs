@@ -40,6 +40,7 @@ public class RayTracer : MonoBehaviour
     private bool dirty = true;
     private int lastRayCount;
     private bool lastEnableGrid;
+    private bool lastСhromaticAberration;
     private float lastSpread;
     private float lastIOR;
     private int lastBounces;
@@ -121,6 +122,7 @@ public class RayTracer : MonoBehaviour
             enableGrid != lastEnableGrid ||
             spread != lastSpread ||
             diamondIOR != lastIOR ||
+            chromaticAberration != lastСhromaticAberration ||
             maxBounces != lastBounces
         )
         {
@@ -128,6 +130,7 @@ public class RayTracer : MonoBehaviour
             lastEnableGrid = enableGrid;
             lastSpread = spread;
             lastIOR = diamondIOR;
+            lastСhromaticAberration = chromaticAberration;
             lastBounces = maxBounces;
 
             changed = true;

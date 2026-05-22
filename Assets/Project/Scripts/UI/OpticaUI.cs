@@ -12,6 +12,7 @@ public class OpticaUI : MonoBehaviour
     public Slider bouncesSlider;
     public Slider spreadSlider;
     public Slider iorSlider;
+    public Toggle —hromaticAberration;
 
     [Header("Value Text")]
     public TMP_Text rayCountValue;
@@ -27,7 +28,8 @@ public class OpticaUI : MonoBehaviour
         iorSlider.value = tracer.diamondIOR;
 
         rayCountSlider.onValueChanged.AddListener(OnRayCountChanged);
-gridToggle.onValueChanged.AddListener(OnGridChanged);
+        gridToggle.onValueChanged.AddListener(OnGridChanged);
+        —hromaticAberration.onValueChanged.AddListener(On—hromaticAberrationChanged);
         bouncesSlider.onValueChanged.AddListener(OnBouncesChanged);
         spreadSlider.onValueChanged.AddListener(OnSpreadChanged);
         iorSlider.onValueChanged.AddListener(OnIORChanged);
@@ -42,9 +44,15 @@ gridToggle.onValueChanged.AddListener(OnGridChanged);
         RefreshText();
     }
 
-    void OnGridChanged(bool value)
+    void OnGridChanged(bool v)
     {
-        tracer.enableGrid = value;
+        tracer.enableGrid = v;
+        tracer.MarkDirty();
+    }
+
+    void On—hromaticAberrationChanged(bool v)
+    {
+        tracer.chromaticAberration = v;
         tracer.MarkDirty();
     }
 
