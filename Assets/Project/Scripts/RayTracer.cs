@@ -37,6 +37,12 @@ public class RayTracer : MonoBehaviour
     [Header("Ray Direction")]
     public Transform rayDirection;
 
+    [Header("Mode")]
+    public PhotonMode mode = PhotonMode.Collimated;
+    public Transform emitter;
+
+    public bool visible = true;
+
     private bool dirty = true;
     private int lastRayCount;
     private bool lastEnableGrid;
@@ -149,6 +155,11 @@ public class RayTracer : MonoBehaviour
     {
         ClearAll();
 
+        if (!visible)
+        {
+            return;
+        }
+
         int xCount = enableGrid ? rayCount : 1;
 
         for (int ix = 0; ix < xCount; ix++)
@@ -215,6 +226,32 @@ public class RayTracer : MonoBehaviour
                 );
             }
         }
+    }
+
+    public Vector3 GetRandomEmitterPoint()
+    {
+        if (emitter == null)
+            return Vector3.zero;
+
+        Bounds b =
+            emitter.GetComponent<Renderer>().bounds;
+
+        float y =
+            Random.Range(b.min.y, b.max.y);
+
+        float z =
+            Random.Range(b.min.z, b.max.z);
+
+        return new Vector3(
+            b.center.x,
+            y,
+            z
+        );
+    }
+
+    public Vector3 GetEmitterDirection()
+    {
+        return emitter.transform.right;
     }
 
     void TraceRayRecursive(
