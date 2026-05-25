@@ -176,7 +176,7 @@ public class MonteCarloSimulator : MonoBehaviour
             SpawnSingle(
                 origin,
                 Quaternion.AngleAxis(
-                    -0.8f,
+                    -0.99f,
                     emitter.up
                 ) * dir,
                 r,
@@ -193,7 +193,7 @@ public class MonteCarloSimulator : MonoBehaviour
             SpawnSingle(
                 origin,
                 Quaternion.AngleAxis(
-                    0.8f,
+                    0.99f,
                     emitter.up
                 ) * dir,
                 b,

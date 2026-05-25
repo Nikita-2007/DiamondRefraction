@@ -34,6 +34,7 @@ public class OpticaUI : MonoBehaviour
     public Slider particleSpreadSlider;
     public Slider particleIORSlider;
     public Slider particleBounceSlider;
+    public Toggle ParticleChromaticToggle;
 
     public Button simulateButton;
     public Button cancelButton;
@@ -60,8 +61,8 @@ public class OpticaUI : MonoBehaviour
         bouncesSlider.value = tracer.maxBounces;
 
         gridToggle.isOn = tracer.enableGrid;
-        chromaticToggle.isOn =
-            tracer.chromaticAberration;
+        chromaticToggle.isOn = tracer.chromaticAberration;
+        
 
         rayCountSlider.onValueChanged
             .AddListener(OnRayCountChanged);
@@ -94,6 +95,7 @@ public class OpticaUI : MonoBehaviour
 
         particleBounceSlider.value =
             simulator.maxBounces;
+        ParticleChromaticToggle.isOn = simulator.chromaticAberration;
 
         photonSlider.onValueChanged
             .AddListener(OnPhotonChanged);
@@ -106,6 +108,9 @@ public class OpticaUI : MonoBehaviour
 
         particleBounceSlider.onValueChanged
             .AddListener(OnParticleBounceChanged);
+
+        ParticleChromaticToggle.onValueChanged
+            .AddListener(OnParticleChromaticChanged);
 
         modeDropdown.onValueChanged
             .AddListener(OnModeChanged);
@@ -150,7 +155,7 @@ public class OpticaUI : MonoBehaviour
         raysPanel.SetActive(false);
         particlesPanel.SetActive(true);
 
-        tracer.visible = true;
+        tracer.visible = false;
         tracer.MarkDirty();
     }
 
@@ -217,6 +222,13 @@ public class OpticaUI : MonoBehaviour
     void OnParticleIORChanged(float v)
     {
         simulator.ior = v;
+        RefreshText();
+    }
+
+    
+    void OnParticleChromaticChanged(bool v)
+    {
+        simulator.chromaticAberration = v;
         RefreshText();
     }
 
